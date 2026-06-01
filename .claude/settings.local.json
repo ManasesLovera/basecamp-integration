@@ -5,7 +5,20 @@
       "WebFetch(domain:pypi.org)",
       "Bash(git -C /home/mlovera/dev/basecamp-test add app/routes/projects.py app/routes/todos.py)",
       "Bash(git -C /home/mlovera/dev/basecamp-test commit -m ' *)",
-      "Bash(git -C /home/mlovera/dev/basecamp-test add app/routes/todos.py)"
+      "Bash(git -C /home/mlovera/dev/basecamp-test add app/routes/todos.py)",
+      "Bash(python3 -c \"import json;d=json.load\\(open\\('tokens.json'\\)\\);print\\({k:\\(v if k=='account_id' or k=='token_expires_at' else '<set>' if v else '<empty>'\\) for k,v in d.items\\(\\)}\\)\")",
+      "Bash(getent hosts *)",
+      "Bash(curl -sS -m 10 -o /dev/null -w \"http_code=%{http_code} time=%{time_total}\\\\n\" https://3.basecampapi.com/)",
+      "Bash(curl -sS -m 10 -o /dev/null -w \"http_code=%{http_code} time=%{time_total}\\\\n\" https://launchpad.37signals.com/)",
+      "Bash(curl -sS -m 10 -o /dev/null -w \"http_code=%{http_code} time=%{time_total}\\\\n\" https://example.com/)",
+      "Bash(env)",
+      "Bash(getent ahosts *)",
+      "Bash(ip -6 route get 2606:4700::1)",
+      "Bash(timeout 30 python3 -c ' *)",
+      "Bash(timeout 30 .venv/bin/python -c ' *)",
+      "Bash(.venv/bin/python -c ' *)",
+      "Bash(git add *)",
+      "Bash(git commit *)"
     ]
   }
 }

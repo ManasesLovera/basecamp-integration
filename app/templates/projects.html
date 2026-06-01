@@ -1,0 +1,25 @@
+{% extends "base.html" %}
+
+{% block title %}Projects — Basecamp{% endblock %}
+
+{% block content %}
+<h1 class="text-2xl font-semibold mb-6">Projects</h1>
+
+{% if projects %}
+<ul class="space-y-3">
+  {% for project in projects %}
+  <li>
+    <a href="/projects/{{ project.id }}/todolists"
+       class="block bg-white rounded-lg border border-gray-200 px-5 py-4 hover:border-green-400 hover:shadow-sm transition-all">
+      <div class="font-medium text-gray-900">{{ project.name }}</div>
+      {% if project.description %}
+      <div class="text-sm text-gray-500 mt-1">{{ project.description | striptags | truncate(120) }}</div>
+      {% endif %}
+    </a>
+  </li>
+  {% endfor %}
+</ul>
+{% else %}
+<p class="text-gray-500">No active projects found.</p>
+{% endif %}
+{% endblock %}

@@ -1,0 +1,9 @@
+name: "Sprint 1 Tasks"
+description: "Initial sprint setup and foundations"
+todos:
+  - content: "Set up CI pipeline"
+    due_on: "2024-02-01"
+  - content: "Write unit tests"
+  - content: "Review pull requests"
+    due_on: "2024-02-05"
+  - content: "Update documentation"

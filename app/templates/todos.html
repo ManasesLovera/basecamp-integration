@@ -1,0 +1,49 @@
+{% extends "base.html" %}
+
+{% block title %}{{ todolist.title }} — {{ project.name }}{% endblock %}
+
+{% block breadcrumbs %}
+<span class="text-gray-400">/</span>
+<a href="/" class="text-sm text-gray-600 hover:text-green-600">Projects</a>
+<span class="text-gray-400">/</span>
+<a href="/projects/{{ project.id }}/todolists" class="text-sm text-gray-600 hover:text-green-600">{{ project.name }}</a>
+<span class="text-gray-400">/</span>
+<span class="text-sm font-medium">{{ todolist.title }}</span>
+{% endblock %}
+
+{% block content %}
+<div class="flex items-center justify-between mb-6">
+  <h1 class="text-2xl font-semibold">{{ todolist.title }}</h1>
+  <span class="text-sm text-gray-500">{{ todolist.completed_ratio }}</span>
+</div>
+
+<!-- Add todo form -->
+<div class="bg-white border border-gray-200 rounded-lg p-5 mb-6">
+  <h2 class="font-medium mb-3">Add To-do</h2>
+  <form hx-post="/projects/{{ project.id }}/todolists/{{ todolist.id }}/todos"
+        hx-target="#todo-list"
+        hx-swap="afterbegin"
+        hx-on::after-request="this.reset()"
+        class="flex gap-3">
+    <input name="content" required placeholder="What needs to be done?"
+           class="flex-1 border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-400">
+    <input name="due_on" type="date"
+           class="border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-400">
+    <button type="submit"
+            class="bg-green-600 text-white px-4 py-2 rounded-md text-sm font-medium hover:bg-green-700 transition-colors">
+      Add
+    </button>
+  </form>
+</div>
+
+<!-- Todo items -->
+<ul id="todo-list" class="space-y-2">
+  {% for todo in todos %}
+    {% include "partials/todo_item.html" %}
+  {% endfor %}
+</ul>
+
+{% if not todos %}
+<p class="text-gray-500 text-sm mt-4">No to-dos yet. Add one above.</p>
+{% endif %}
+{% endblock %}

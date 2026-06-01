@@ -33,7 +33,11 @@ class BasecampClient:
         self._http: httpx.AsyncClient | None = None
 
     async def __aenter__(self):
-        self._http = httpx.AsyncClient(base_url=self._base_url, headers={"User-Agent": USER_AGENT})
+        self._http = httpx.AsyncClient(
+            base_url=self._base_url,
+            headers={"User-Agent": USER_AGENT},
+            timeout=httpx.Timeout(10.0, connect=5.0),
+        )
         if _is_token_expired(self._tokens):
             await self._refresh_token()
         return self
@@ -68,49 +72,44 @@ class BasecampClient:
         )
         self._tokens = load_tokens()
 
-    async def _get(self, path: str, params: dict | None = None) -> dict | list:
+    async def _send(self, method: str, path: str, **kwargs) -> httpx.Response:
+        """Send a request, retrying on transient transport errors and 401/429."""
         assert self._http is not None
-        for _ in range(3):
-            resp = await self._http.get(path, params=params, headers=self._auth_headers())
+        for attempt in range(3):
+            try:
+                resp = await self._http.request(
+                    method, path, headers=self._auth_headers(), **kwargs
+                )
+            except httpx.TransportError:
+                if attempt == 2:
+                    raise
+                await asyncio.sleep(0.5 * (attempt + 1))
+                continue
             if resp.status_code == 401:
                 await self._refresh_token()
                 continue
             if resp.status_code == 429:
                 await asyncio.sleep(int(resp.headers.get("Retry-After", "5")))
                 continue
-            resp.raise_for_status()
-            return resp.json()
+            return resp
         raise RuntimeError("Failed after retries")
+
+    async def _get(self, path: str, params: dict | None = None) -> dict | list:
+        resp = await self._send("GET", path, params=params)
+        resp.raise_for_status()
+        return resp.json()
 
     async def _post(self, path: str, json: dict | None = None) -> dict | None:
-        assert self._http is not None
-        for _ in range(3):
-            resp = await self._http.post(path, json=json, headers=self._auth_headers())
-            if resp.status_code == 401:
-                await self._refresh_token()
-                continue
-            if resp.status_code == 429:
-                await asyncio.sleep(int(resp.headers.get("Retry-After", "5")))
-                continue
-            if resp.status_code == 204:
-                return None
-            resp.raise_for_status()
-            return resp.json()
-        raise RuntimeError("Failed after retries")
+        resp = await self._send("POST", path, json=json)
+        if resp.status_code == 204:
+            return None
+        resp.raise_for_status()
+        return resp.json()
 
     async def _put(self, path: str, json: dict) -> dict:
-        assert self._http is not None
-        for _ in range(3):
-            resp = await self._http.put(path, json=json, headers=self._auth_headers())
-            if resp.status_code == 401:
-                await self._refresh_token()
-                continue
-            if resp.status_code == 429:
-                await asyncio.sleep(int(resp.headers.get("Retry-After", "5")))
-                continue
-            resp.raise_for_status()
-            return resp.json()
-        raise RuntimeError("Failed after retries")
+        resp = await self._send("PUT", path, json=json)
+        resp.raise_for_status()
+        return resp.json()
 
     # --- Projects ---
 
@@ -173,11 +172,7 @@ class BasecampClient:
         await self._post(f"/buckets/{project_id}/todos/{todo_id}/completion.json")
 
     async def uncomplete_todo(self, project_id: int, todo_id: int) -> None:
-        assert self._http is not None
-        resp = await self._http.delete(
-            f"/buckets/{project_id}/todos/{todo_id}/completion.json",
-            headers=self._auth_headers(),
-        )
+        resp = await self._send("DELETE", f"/buckets/{project_id}/todos/{todo_id}/completion.json")
         resp.raise_for_status()
 
     async def create_todolist_from_template(

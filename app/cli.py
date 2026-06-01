@@ -1,11 +1,16 @@
 import asyncio
 import json
+import os
 from pathlib import Path
+from urllib.parse import urlencode
 
 import click
 import yaml
+from dotenv import load_dotenv
 
 from app.client import BasecampClient
+
+load_dotenv()
 
 
 def run(coro):
@@ -15,6 +20,21 @@ def run(coro):
 @click.group()
 def cli():
     """Basecamp CLI — manage todos, todolists, and projects."""
+
+
+# ---------------------------------------------------------------------------
+# Auth
+# ---------------------------------------------------------------------------
+
+@cli.command("auth-url")
+def auth_url():
+    """Print the Basecamp OAuth authorization URL to open in a browser."""
+    client_id = os.getenv("CLIENT_ID")
+    redirect_uri = os.getenv("REDIRECT_URI")
+    if not client_id or not redirect_uri:
+        raise click.UsageError("CLIENT_ID and REDIRECT_URI must be set in .env")
+    params = urlencode({"response_type": "code", "client_id": client_id, "redirect_uri": redirect_uri})
+    click.echo(f"https://launchpad.37signals.com/authorization/new?{params}")
 
 
 # ---------------------------------------------------------------------------

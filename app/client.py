@@ -1,24 +1,21 @@
 import asyncio
 import os
 from datetime import datetime, timezone, timedelta
-from pathlib import Path
 
 import httpx
-from dotenv import load_dotenv, set_key
+from dotenv import load_dotenv
 
-ENV_PATH = Path(__file__).resolve().parent.parent / ".env"
+from oauth.token_store import load_tokens, save_tokens
+
+load_dotenv()
 
 LAUNCHPAD_TOKEN_URL = "https://launchpad.37signals.com/authorization/token"
 BC3_BASE = "https://3.basecampapi.com"
 USER_AGENT = "Basecamp Integration (contact@example.com)"
 
 
-def _reload_env() -> None:
-    load_dotenv(ENV_PATH, override=True)
-
-
-def _is_token_expired() -> bool:
-    expires_at = os.getenv("TOKEN_EXPIRES_AT")
+def _is_token_expired(tokens: dict) -> bool:
+    expires_at = tokens.get("token_expires_at")
     if not expires_at:
         return False
     try:
@@ -30,14 +27,15 @@ def _is_token_expired() -> bool:
 
 class BasecampClient:
     def __init__(self):
-        _reload_env()
-        self._account_id = os.getenv("ACCOUNT_ID")
+        self._tokens = load_tokens()
+        self._account_id = self._tokens.get("account_id")
         self._base_url = f"{BC3_BASE}/{self._account_id}"
         self._http: httpx.AsyncClient | None = None
 
     async def __aenter__(self):
         self._http = httpx.AsyncClient(base_url=self._base_url, headers={"User-Agent": USER_AGENT})
-        await self._ensure_fresh_token()
+        if _is_token_expired(self._tokens):
+            await self._refresh_token()
         return self
 
     async def __aexit__(self, *_):
@@ -45,11 +43,7 @@ class BasecampClient:
             await self._http.aclose()
 
     def _auth_headers(self) -> dict:
-        return {"Authorization": f"Bearer {os.getenv('ACCESS_TOKEN')}"}
-
-    async def _ensure_fresh_token(self) -> None:
-        if _is_token_expired():
-            await self._refresh_token()
+        return {"Authorization": f"Bearer {self._tokens['access_token']}"}
 
     async def _refresh_token(self) -> None:
         async with httpx.AsyncClient() as client:
@@ -59,33 +53,30 @@ class BasecampClient:
                     "type": "refresh",
                     "client_id": os.getenv("CLIENT_ID"),
                     "client_secret": os.getenv("CLIENT_SECRET"),
-                    "refresh_token": os.getenv("REFRESH_TOKEN"),
+                    "refresh_token": self._tokens["refresh_token"],
                 },
                 headers={"Accept": "application/json"},
             )
             resp.raise_for_status()
-            tokens = resp.json()
+            data = resp.json()
 
-        expires_in = tokens.get("expires_in", 1209600)
-        expires_at = datetime.now(timezone.utc) + timedelta(seconds=expires_in)
-        for key, value in {
-            "ACCESS_TOKEN": tokens["access_token"],
-            "REFRESH_TOKEN": tokens["refresh_token"],
-            "TOKEN_EXPIRES_AT": expires_at.isoformat(),
-        }.items():
-            set_key(str(ENV_PATH), key, value)
-        _reload_env()
+        save_tokens(
+            data["access_token"],
+            data["refresh_token"],
+            data.get("expires_in", 1209600),
+            self._tokens["account_id"],
+        )
+        self._tokens = load_tokens()
 
     async def _get(self, path: str, params: dict | None = None) -> dict | list:
         assert self._http is not None
-        for attempt in range(3):
+        for _ in range(3):
             resp = await self._http.get(path, params=params, headers=self._auth_headers())
             if resp.status_code == 401:
                 await self._refresh_token()
                 continue
             if resp.status_code == 429:
-                retry_after = int(resp.headers.get("Retry-After", "5"))
-                await asyncio.sleep(retry_after)
+                await asyncio.sleep(int(resp.headers.get("Retry-After", "5")))
                 continue
             resp.raise_for_status()
             return resp.json()
@@ -93,7 +84,7 @@ class BasecampClient:
 
     async def _post(self, path: str, json: dict | None = None) -> dict | None:
         assert self._http is not None
-        for attempt in range(3):
+        for _ in range(3):
             resp = await self._http.post(path, json=json, headers=self._auth_headers())
             if resp.status_code == 401:
                 await self._refresh_token()
@@ -109,7 +100,7 @@ class BasecampClient:
 
     async def _put(self, path: str, json: dict) -> dict:
         assert self._http is not None
-        for attempt in range(3):
+        for _ in range(3):
             resp = await self._http.put(path, json=json, headers=self._auth_headers())
             if resp.status_code == 401:
                 await self._refresh_token()

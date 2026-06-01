@@ -18,7 +18,11 @@
       "Bash(timeout 30 .venv/bin/python -c ' *)",
       "Bash(.venv/bin/python -c ' *)",
       "Bash(git add *)",
-      "Bash(git commit *)"
+      "Bash(git commit *)",
+      "Bash(python *)",
+      "Bash(uv run *)",
+      "Bash(git checkout *)",
+      "Bash(gh pr *)"
     ]
   }
 }

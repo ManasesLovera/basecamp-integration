@@ -19,7 +19,7 @@ async def todolists_page(request: Request, project_id: int):
         todolists = await bc.get_todolists(project_id, _todoset_id(project))
     return templates.TemplateResponse(
         request, "todolists.html",
-        {"project": project, "todolists": todolists},
+        {"project": project, "todolists": todolists, "project_id": project_id},
     )
 
 

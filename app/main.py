@@ -4,7 +4,7 @@ from dotenv import load_dotenv
 from fastapi import FastAPI
 from fastapi.staticfiles import StaticFiles
 
-from app.routes import projects, todos
+from app.routes import people, projects, todos
 
 load_dotenv()
 
@@ -15,4 +15,5 @@ static_dir.mkdir(exist_ok=True)
 app.mount("/static", StaticFiles(directory=str(static_dir)), name="static")
 
 app.include_router(projects.router)
+app.include_router(people.router)
 app.include_router(todos.router)

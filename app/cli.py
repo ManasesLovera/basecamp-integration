@@ -1,6 +1,7 @@
 import asyncio
 import json
 import os
+import re
 from pathlib import Path
 from urllib.parse import urlencode
 
@@ -15,6 +16,28 @@ load_dotenv()
 
 def run(coro):
     return asyncio.run(coro)
+
+
+_TODOLIST_URL_RE = re.compile(
+    r"buckets/(?P<project_id>\d+)/todolists/(?P<todolist_id>\d+)"
+)
+
+
+def parse_todolist_url(url: str) -> tuple[int, int]:
+    """Extract (project_id, todolist_id) from a Basecamp todolist URL.
+
+    Accepts URLs like
+    https://app.basecamp.com/<account>/buckets/<project>/todolists/<todolist>
+    The account segment is ignored; the CLI always operates on the account
+    configured in .env (ACCOUNT_ID).
+    """
+    m = _TODOLIST_URL_RE.search(url)
+    if not m:
+        raise click.UsageError(
+            "Could not parse a todolist URL. Expected something like "
+            "https://app.basecamp.com/<account>/buckets/<project>/todolists/<todolist>"
+        )
+    return int(m.group("project_id")), int(m.group("todolist_id"))
 
 
 @click.group()
@@ -51,6 +74,26 @@ def list_projects():
         click.echo("-" * 50)
         for p in projects:
             click.echo(f"{p['id']:<12} {p['name']}")
+
+    run(_run())
+
+
+# ---------------------------------------------------------------------------
+# People
+# ---------------------------------------------------------------------------
+
+@cli.command("list-people")
+def list_people():
+    """List all people on the Basecamp account."""
+    async def _run():
+        async with BasecampClient() as bc:
+            people = await bc.get_people()
+        click.echo(f"{'ID':<12} {'Name':<28} {'Email'}")
+        click.echo("-" * 70)
+        for person in people:
+            click.echo(
+                f"{person['id']:<12} {person['name']:<28} {person.get('email_address', '')}"
+            )
 
     run(_run())
 
@@ -204,5 +247,106 @@ def create_from_template(project_id: int, template_file: Path):
                 description=data.get("description", ""),
             )
         click.echo(f"Created todolist '{result['title']}' (ID: {result['id']}) with {len(todos)} todo(s).")
+
+    run(_run())
+
+
+@cli.command("create-from-todolist")
+@click.option(
+    "--source-url",
+    default=None,
+    help="URL of an existing Basecamp todolist to copy as a template",
+)
+@click.option(
+    "--source-project-id",
+    type=int,
+    default=None,
+    help="Source project ID (use with --source-todolist-id instead of --source-url)",
+)
+@click.option(
+    "--source-todolist-id",
+    type=int,
+    default=None,
+    help="Source todolist ID (use with --source-project-id instead of --source-url)",
+)
+@click.option(
+    "--project-id",
+    "target_project_id",
+    required=True,
+    type=int,
+    help="Target project ID to create the new todolist in",
+)
+@click.option(
+    "--name",
+    default=None,
+    help="Name for the new todolist (defaults to the source todolist's title)",
+)
+@click.option(
+    "--include-completed",
+    is_flag=True,
+    default=False,
+    help="Also copy completed todos (by default only active ones are copied)",
+)
+def create_from_todolist(
+    source_url: str | None,
+    source_project_id: int | None,
+    source_todolist_id: int | None,
+    target_project_id: int,
+    name: str | None,
+    include_completed: bool,
+):
+    """Create a new todolist by copying an existing Basecamp todolist.
+
+    Provide either --source-url (a Basecamp todolist URL) or both
+    --source-project-id and --source-todolist-id.
+
+    Example:
+      basecamp-cli create-from-todolist \\
+        --source-url https://app.basecamp.com/6219194/buckets/47495391/todolists/9944862625 \\
+        --project-id 47495391
+    """
+    if source_url:
+        src_project_id, src_todolist_id = parse_todolist_url(source_url)
+    elif source_project_id and source_todolist_id:
+        src_project_id, src_todolist_id = source_project_id, source_todolist_id
+    else:
+        raise click.UsageError(
+            "Provide either --source-url or both --source-project-id and --source-todolist-id."
+        )
+
+    async def _run():
+        async with BasecampClient() as bc:
+            source = await bc.get_todolist(src_project_id, src_todolist_id)
+            todos = await bc.get_todos(src_project_id, src_todolist_id)
+            if include_completed:
+                todos = todos + await bc.get_todos(
+                    src_project_id, src_todolist_id, completed=True
+                )
+
+            project = await bc.get_project(target_project_id)
+            todoset = next(
+                t for t in project["dock"] if t["name"] == "todoset" and t["enabled"]
+            )
+
+            new_todos = [
+                {
+                    "content": t["content"],
+                    "description": t.get("description") or "",
+                    "due_on": t.get("due_on"),
+                }
+                for t in todos
+            ]
+
+            result = await bc.create_todolist_from_template(
+                project_id=target_project_id,
+                todoset_id=todoset["id"],
+                name=name or source["title"],
+                todos=new_todos,
+                description=source.get("description") or "",
+            )
+        click.echo(
+            f"Created todolist '{result['title']}' (ID: {result['id']}) "
+            f"with {len(new_todos)} todo(s) copied from '{source['title']}'."
+        )
 
     run(_run())

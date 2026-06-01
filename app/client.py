@@ -119,6 +119,11 @@ class BasecampClient:
     async def get_project(self, project_id: int) -> dict:
         return await self._get(f"/projects/{project_id}.json")  # type: ignore[return-value]
 
+    # --- People ---
+
+    async def get_people(self) -> list:
+        return await self._get("/people.json")  # type: ignore[return-value]
+
     # --- Todosets ---
 
     async def get_todoset(self, project_id: int, todoset_id: int) -> dict:

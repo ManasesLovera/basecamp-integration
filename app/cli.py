@@ -79,6 +79,26 @@ def list_projects():
 
 
 # ---------------------------------------------------------------------------
+# People
+# ---------------------------------------------------------------------------
+
+@cli.command("list-people")
+def list_people():
+    """List all people on the Basecamp account."""
+    async def _run():
+        async with BasecampClient() as bc:
+            people = await bc.get_people()
+        click.echo(f"{'ID':<12} {'Name':<28} {'Email'}")
+        click.echo("-" * 70)
+        for person in people:
+            click.echo(
+                f"{person['id']:<12} {person['name']:<28} {person.get('email_address', '')}"
+            )
+
+    run(_run())
+
+
+# ---------------------------------------------------------------------------
 # Todolists
 # ---------------------------------------------------------------------------
 

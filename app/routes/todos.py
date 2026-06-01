@@ -47,7 +47,13 @@ async def todos_page(request: Request, project_id: int, todolist_id: int):
         todos = await bc.get_todos(project_id, todolist_id)
     return templates.TemplateResponse(
         request, "todos.html",
-        {"project": project, "todolist": todolist, "todos": todos},
+        {
+            "project": project,
+            "todolist": todolist,
+            "todos": todos,
+            "project_id": project_id,
+            "todolist_id": todolist_id,
+        },
     )
 
 

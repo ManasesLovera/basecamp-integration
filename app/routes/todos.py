@@ -18,8 +18,8 @@ async def todolists_page(request: Request, project_id: int):
         project = await bc.get_project(project_id)
         todolists = await bc.get_todolists(project_id, _todoset_id(project))
     return templates.TemplateResponse(
-        "todolists.html",
-        {"request": request, "project": project, "todolists": todolists},
+        request, "todolists.html",
+        {"project": project, "todolists": todolists},
     )
 
 
@@ -34,8 +34,8 @@ async def create_todolist(
         project = await bc.get_project(project_id)
         todolist = await bc.create_todolist(project_id, _todoset_id(project), name, description)
     return templates.TemplateResponse(
-        "partials/todolist_row.html",
-        {"request": request, "project_id": project_id, "todolist": todolist},
+        request, "partials/todolist_row.html",
+        {"project_id": project_id, "todolist": todolist},
     )
 
 
@@ -46,8 +46,8 @@ async def todos_page(request: Request, project_id: int, todolist_id: int):
         todolist = await bc.get_todolist(project_id, todolist_id)
         todos = await bc.get_todos(project_id, todolist_id)
     return templates.TemplateResponse(
-        "todos.html",
-        {"request": request, "project": project, "todolist": todolist, "todos": todos},
+        request, "todos.html",
+        {"project": project, "todolist": todolist, "todos": todos},
     )
 
 
@@ -67,8 +67,8 @@ async def create_todo(
             due_on=due_on or None,
         )
     return templates.TemplateResponse(
-        "partials/todo_item.html",
-        {"request": request, "project_id": project_id, "todolist_id": todolist_id, "todo": todo},
+        request, "partials/todo_item.html",
+        {"project_id": project_id, "todolist_id": todolist_id, "todo": todo},
     )
 
 
@@ -78,6 +78,6 @@ async def complete_todo(request: Request, project_id: int, todo_id: int, todolis
         await bc.complete_todo(project_id, todo_id)
         todo = await bc.get_todo(project_id, todo_id)
     return templates.TemplateResponse(
-        "partials/todo_item.html",
-        {"request": request, "project_id": project_id, "todolist_id": todolist_id, "todo": todo},
+        request, "partials/todo_item.html",
+        {"project_id": project_id, "todolist_id": todolist_id, "todo": todo},
     )

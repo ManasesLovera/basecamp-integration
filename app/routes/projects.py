@@ -12,4 +12,4 @@ templates = Jinja2Templates(directory="app/templates")
 async def index(request: Request):
     async with BasecampClient() as bc:
         projects = await bc.get_projects()
-    return templates.TemplateResponse("projects.html", {"request": request, "projects": projects})
+    return templates.TemplateResponse(request, "projects.html", {"projects": projects})
